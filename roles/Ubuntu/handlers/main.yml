@@ -1,0 +1,9 @@
+---
+- name: Restart Docker service
+  systemd:
+    name: "{{ item }}"
+    state: restarted
+    enabled: yes
+  loop:
+    - docker
+    - containerd

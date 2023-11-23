@@ -1,0 +1,45 @@
+---
+- name: Ensure directory for Dockerfile exists
+  file:
+    path: /home/server4/docker_config
+    state: directory
+
+- name: Copy Dockerfile to configuration directory
+  copy:
+    src: Dockerfile
+    dest: /home/server4/docker_config
+    owner: server4
+    group: server4
+
+- name: Create data volume directory
+  file:
+    path: /home/server4/pages
+    state: directory
+
+- name: Build Docker image
+  community.docker.docker_image:
+    name: lamp-server4
+    tag: 1.0
+    build:
+      path: /home/server4/docker_config
+    source: build
+
+- name: Deploy Docker container
+  community.docker.docker_container:
+    name: lamp-server4
+    image: lamp-server4:1.0
+    state: started
+    exposed_ports:
+      - "80"
+    ports:
+      - "8080:80"
+    volumes:
+      - /home/server4/pages:/var/www/html
+
+- block:
+  - name: Check if lamp-userver container is running
+    shell: docker ps
+    register: container_status
+
+  - debug:
+      msg="{{ container_status }}"

@@ -1,0 +1,92 @@
+---
+- name: Remove old Docker versions
+  apt:
+    name:
+      - docker
+      - docker-engine
+      - docker.io
+      - containerd
+      - runc
+    state: absent
+
+- name: Create directory for Docker packages
+  file:
+    path: /home/server4/docker-deb
+    state: directory
+
+- name: Download Docker components
+  get_url:
+    url: "https://download.docker.com/linux/ubuntu/dists/jammy/pool/stable/amd64/{{ item }}"
+    dest: /home/server4/docker-deb
+  with_items:
+    - "{{ docker_apps.containerd }}.deb"
+    - "{{ docker_apps.docker_ce_cli }}.deb"
+    - "{{ docker_apps.docker_ce }}.deb"
+    - "{{ docker_apps.docker_compose }}.deb"
+
+- name: Install Docker components
+  shell: |
+    cd /home/server4/docker-deb
+    dpkg -i "{{ item }}"
+  with_items:
+    - "{{ docker_apps.containerd }}.deb"
+    - "{{ docker_apps.docker_ce_cli }}.deb"
+    - "{{ docker_apps.docker_ce }}.deb"
+    - "{{ docker_apps.docker_compose }}.deb"
+
+- name: Fix permissions for /var/run/docker.sock
+  shell: chmod 666 /var/run/docker.sock
+
+- name: Ensure docker group exists
+  group:
+    name: docker
+    state: present
+
+- name: Add current user to docker group
+  user:
+    name: server4
+    groups: docker
+    append: yes
+
+- name: Start Docker services
+  service:
+    name: "{{ item }}"
+    state: started
+  with_items:
+    - docker
+    - containerd
+
+- name: Install Python
+  apt:
+    name: python3-pip
+
+- name: Install Python SDK
+  become_user: "{{ ansible_env.SUDO_USER }}"
+  pip:
+    name:
+      - docker
+      - docker-compose
+
+- block:
+  - name: Verify Docker service status
+    shell: systemctl list-unit-files | grep docker
+    register: docker_service_status
+
+  - debug:
+      msg="{{ docker_service_status }}"
+
+- block:
+  - name: Verify user groups
+    shell: groups server4
+    register: user_groups
+
+  - debug:
+      msg="{{ user_groups }}"
+
+- block:
+  - name: Verify Docker installation
+    shell: docker --version
+    register: docker_version
+
+  - debug:
+      msg="{{ docker_version }}"
